@@ -4,7 +4,7 @@
   // ----- Config -----
   const CANVAS_ID = 'gameCanvas';
   const GRAVITY = 0.08;
-  const FLAP_STRENGTH = -3;
+  const FLAP_STRENGTH = -1.5;
   const PIPE_SPEED = 1.2;
   const PIPE_GAP = 260; // vertical gap
   const PIPE_INTERVAL = 1400; // ms between pipes
@@ -370,6 +370,7 @@
   });
 
 })();
+
 
 
 
