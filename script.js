@@ -3,7 +3,7 @@
 (() => {
   // ----- Config (baseline units tuned for 60 FPS) -----
   const CANVAS_ID = 'gameCanvas';
-  const BASE_GRAVITY = 0.5;        // per 60fps
+  const BASE_GRAVITY = 0.4;        // per 60fps
   const BASE_FLAP_STRENGTH = -4.6;  // per 60fps
   const BASE_PIPE_SPEED = 1.5;      // pixels per 60fps tick
   const PIPE_GAP = 200;             // vertical gap (internal pixels)
@@ -379,6 +379,7 @@
   renderLeaderboard();
 
 })();
+
 
 
 
