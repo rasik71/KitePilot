@@ -3,12 +3,12 @@
 (() => {
   // ----- Config -----
   const CANVAS_ID = 'gameCanvas';
-  const GRAVITY = 0.2;
-  const FLAP_STRENGTH = -5.8;
-  const PIPE_SPEED = 0.9;
-  const PIPE_GAP = 240; // vertical gap
-  const PIPE_INTERVAL = 100; // ms between pipes
-  const BIRD_X = 120; // fixed horizontal position of the kite
+  const GRAVITY = 0.25;
+  const FLAP_STRENGTH = -6;
+  const PIPE_SPEED = 1.2;
+  const PIPE_GAP = 280; // vertical gap
+  const PIPE_INTERVAL = 1500; // ms between pipes
+  const BIRD_X = 100; // fixed horizontal position of the kite
   const STORAGE_KEY = 'kitepilot_scores_v1';
 
   // ----- DOM -----
@@ -370,6 +370,7 @@
   });
 
 })();
+
 
 
 
