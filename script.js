@@ -6,8 +6,8 @@
   const BASE_GRAVITY = 0.5;        // per 60fps
   const BASE_FLAP_STRENGTH = -4.6;  // per 60fps
   const BASE_PIPE_SPEED = 1.5;      // pixels per 60fps tick
-  const PIPE_GAP = 180;             // vertical gap (internal pixels)
-  const PIPE_INTERVAL = 2000;       // ms between pipes
+  const PIPE_GAP = 200;             // vertical gap (internal pixels)
+  const PIPE_INTERVAL = 1800;       // ms between pipes
   const BIRD_X = 140;                // fixed horizontal position (internal coords)
   const STORAGE_KEY = 'kitepilot_scores_v1';
 
@@ -379,6 +379,7 @@
   renderLeaderboard();
 
 })();
+
 
 
 
