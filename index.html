@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kite Pilot — Made by rasik7444</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Registration / Start modal -->
+  <div id="overlay" class="overlay">
+    <div class="modal">
+      <img src="assets/kite_logo.png" alt="Kite AI logo" class="logo-large" />
+      <h1>Kite Pilot</h1>
+      <p class="muted">Fly the Kite AI logo through the pipes. Tap/click or press <kbd>Space</kbd> to flap.</p>
+
+      <label for="discordName">Enter your Discord name</label>
+      <input id="discordName" type="text" placeholder="username#1234" maxlength="32" />
+
+      <div class="row">
+        <button id="startBtn" class="btn primary">Start Game</button>
+        <button id="viewLeaderboard" class="btn">Local Leaderboard</button>
+      </div>
+
+      <small class="muted">This game saves scores locally only (your device).</small>
+    </div>
+  </div>
+
+  <!-- Game container -->
+  <main class="game-wrap">
+    <canvas id="gameCanvas" width="480" height="720" aria-label="Kite Pilot game"></canvas>
+
+    <!-- HUD -->
+    <div class="hud">
+      <div id="scoreLive" class="score">0</div>
+      <button id="muteBtn" class="icon-btn" title="Toggle sound">🔊</button>
+    </div>
+
+    <!-- Game over / final screen -->
+    <div id="gameOver" class="overlay hidden">
+      <div class="modal">
+        <h2>Game Over</h2>
+        <p>Your score: <strong id="finalScore">0</strong></p>
+        <p id="madeBy" class="muted">Made by rasik7444</p>
+        <div class="row">
+          <button id="playAgain" class="btn primary">Play Again</button>
+          <button id="showBoard" class="btn">Leaderboard</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leaderboard modal -->
+    <div id="leaderModal" class="overlay hidden">
+      <div class="modal">
+        <h2>Local Leaderboard</h2>
+        <ol id="leaderList" class="leader-list"></ol>
+        <div class="row">
+          <button id="clearScores" class="btn warn">Clear Scores</button>
+          <button id="closeBoard" class="btn">Close</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
