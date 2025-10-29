@@ -1,14 +1,14 @@
-// Kite Pilot — script.js
-// Basic Flappy-like game, local leaderboard saved to localStorage
+
+// Kite Pilot — script.js (fixed: framerate-independent, universal Flappy feel)
 (() => {
-  // ----- Config -----
+  // ----- Config (baseline units tuned for 60 FPS) -----
   const CANVAS_ID = 'gameCanvas';
-  const GRAVITY = 0.08;
-  const FLAP_STRENGTH = -1.5;
-  const PIPE_SPEED = 1.2;
-  const PIPE_GAP = 260; // vertical gap
-  const PIPE_INTERVAL = 1400; // ms between pipes
-  const BIRD_X = 100; // fixed horizontal position of the kite
+  const BASE_GRAVITY = 0.25;        // per 60fps
+  const BASE_FLAP_STRENGTH = -4.6;  // per 60fps
+  const BASE_PIPE_SPEED = 1.5;      // pixels per 60fps tick
+  const PIPE_GAP = 130;             // vertical gap (internal pixels)
+  const PIPE_INTERVAL = 1500;       // ms between pipes
+  const BIRD_X = 80;                // fixed horizontal position (internal coords)
   const STORAGE_KEY = 'kitepilot_scores_v1';
 
   // ----- DOM -----
@@ -29,13 +29,18 @@
   const closeBoard = document.getElementById('closeBoard');
   const clearScores = document.getElementById('clearScores');
 
-  // responsive canvas sizing (keeps internal resolution fixed for physics)
+  // Keep an internal fixed resolution for predictable physics
+  const INTERNAL_W = 480;
+  const INTERNAL_H = 720;
+
   function resizeCanvas() {
-    const rect = canvas.getBoundingClientRect();
-    const scale = rect.width / 480;
-    canvas.style.height = `${480 * (rect.width / 480) * (720/480)}px`; // keep aspect
-    canvas.width = 480;
-    canvas.height = 720;
+    // keep internal resolution fixed, scale canvas visually to fit parent width
+    canvas.width = INTERNAL_W;
+    canvas.height = INTERNAL_H;
+    canvas.style.width = '100%';
+    canvas.style.height = 'auto';
+    // optional: adjust image smoothing for crisp pixel-like rendering
+    ctx.imageSmoothingEnabled = true;
   }
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
@@ -47,10 +52,10 @@
   // sound (tiny)
   let muted = true;
   const flapSound = new Audio();
-  flapSound.src = 'data:audio/mp3;base64,//uQxAAAAAAAAAAAA...'; // left empty to avoid large base64
+  flapSound.src = ''; // provide a small sound file if you want
   flapSound.volume = 0.25;
 
-  muteBtn.addEventListener('click', () => {
+  muteBtn && muteBtn.addEventListener('click', () => {
     muted = !muted;
     muteBtn.textContent = muted ? '🔇' : '🔊';
   });
@@ -63,33 +68,52 @@
   let score = 0;
   let loopId = null;
   let playerName = 'Player';
+  let lastFrameTime = 0;
+
+  // Utility
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function shadeColor(hex, percent) {
+    const num = parseInt(hex.slice(1),16),
+      r = (num >> 16) + percent,
+      g = ((num >> 8) & 0x00FF) + percent,
+      b = (num & 0x0000FF) + percent;
+    return '#' + (0x1000000 + (clamp(r,0,255)<<16) + (clamp(g,0,255)<<8) + clamp(b,0,255)).toString(16).slice(1);
+  }
+  function escapeHtml(t){ return (t+'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
 
   // Bird (kite) class
   class Bird {
     constructor() {
       this.x = BIRD_X;
-      this.y = canvas.height / 2;
+      this.y = INTERNAL_H / 2;
       this.vel = 0;
       this.width = 56;
       this.height = 42;
       this.rotation = 0;
     }
     flap() {
-      this.vel = FLAP_STRENGTH;
-      if (!muted) try { flapSound.cloneNode().play(); } catch(e){}
+      this.vel = BASE_FLAP_STRENGTH;
+      if (!muted && flapSound.src) try { flapSound.cloneNode().play(); } catch(e){}
     }
-    update() {
-      this.vel += GRAVITY;
-      this.y += this.vel;
+    update(delta) {
+      // delta is normalized to 60 FPS ticks (1 = 1 frame at 60fps)
+      this.vel += BASE_GRAVITY * delta;
+      this.y += this.vel * delta;
       this.rotation = Math.max(Math.min(this.vel / 12, 0.8), -0.8);
     }
     draw(ctx) {
       ctx.save();
+      // draw at internal coords
       ctx.translate(this.x, this.y);
       ctx.rotate(this.rotation);
-      // draw kite logo image centered
       const iw = this.width, ih = this.height;
-      ctx.drawImage(logo, -iw/2, -ih/2, iw, ih);
+      if (logo.complete && logo.naturalWidth) {
+        ctx.drawImage(logo, -iw/2, -ih/2, iw, ih);
+      } else {
+        // fallback placeholder
+        ctx.fillStyle = '#ff6b6b';
+        ctx.fillRect(-iw/2, -ih/2, iw, ih);
+      }
       ctx.restore();
     }
     bounds() {
@@ -110,20 +134,17 @@
       this.width = 68;
       this.passed = false;
     }
-    update(dt) {
-      this.x -= PIPE_SPEED;
+    update(delta) {
+      this.x -= BASE_PIPE_SPEED * delta;
     }
     draw(ctx) {
-      // top pipe
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--pipe') || '#3ea34a';
-      const radius = 8;
-      // top rect
+      const pipeColor = getComputedStyle(document.documentElement).getPropertyValue('--pipe') || '#3ea34a';
+      ctx.fillStyle = pipeColor;
       ctx.fillRect(this.x, 0, this.width, this.top);
-      // bottom rect
       const bottomY = this.top + PIPE_GAP;
-      ctx.fillRect(this.x, bottomY, this.width, canvas.height - bottomY);
-      // pipe caps (rounded)
-      ctx.fillStyle = shadeColor('#3ea34a', -6);
+      ctx.fillRect(this.x, bottomY, this.width, INTERNAL_H - bottomY);
+      // caps
+      ctx.fillStyle = shadeColor(pipeColor, -6);
       ctx.fillRect(this.x - 6, this.top - 12, this.width + 12, 12);
       ctx.fillRect(this.x - 6, bottomY, this.width + 12, 12);
     }
@@ -137,41 +158,30 @@
     }
   }
 
-  // utility: small color shade
-  function shadeColor(hex, percent) {
-    // hex like #RRGGBB
-    const num = parseInt(hex.slice(1),16),
-      r = (num >> 16) + percent,
-      g = ((num >> 8) & 0x00FF) + percent,
-      b = (num & 0x0000FF) + percent;
-    return '#' + (0x1000000 + (clamp(r,0,255)<<16) + (clamp(g,0,255)<<8) + clamp(b,0,255)).toString(16).slice(1);
-  }
-  function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
-
   // Reset game
-  function resetGame() {
+  function resetGame(startTime) {
     bird = new Bird();
     pipes = [];
-    lastPipeTime = performance.now();
+    lastPipeTime = startTime;
     score = 0;
     running = true;
-    scoreLive.innerText = '0';
-    gameOverEl.classList.add('hidden');
+    scoreLive && (scoreLive.innerText = '0');
+    gameOverEl && gameOverEl.classList.add('hidden');
   }
 
   // Spawn pipe
   function spawnPipe() {
     const minTop = 60;
-    const maxTop = canvas.height - PIPE_GAP - 120;
+    const maxTop = INTERNAL_H - PIPE_GAP - 120;
     const top = Math.floor(Math.random() * (maxTop - minTop + 1)) + minTop;
-    pipes.push(new Pipe(canvas.width + 40, top));
+    pipes.push(new Pipe(INTERNAL_W + 40, top));
   }
 
   // Collision detection (AABB vs pipes)
   function checkCollision() {
     const b = bird.bounds();
     // floor / ceiling
-    if (b.top < 0 || b.bottom > canvas.height) return true;
+    if (b.top < 0 || b.bottom > INTERNAL_H) return true;
     for (const p of pipes) {
       const pb = p.bounds();
       // if bird horizontally overlaps pipe
@@ -191,7 +201,6 @@
       const now = new Date().toISOString();
       const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       list.push({name: name, score: pts, date: now});
-      // sort desc and keep top 50
       list.sort((a,b)=>b.score - a.score || new Date(b.date) - new Date(a.date));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(list.slice(0,50)));
     } catch(e){ console.warn('save fail', e) }
@@ -203,7 +212,6 @@
     } catch(e){ return [] }
   }
 
-  // show leaderboard
   function renderLeaderboard() {
     const list = getScores();
     leaderList.innerHTML = '';
@@ -221,19 +229,57 @@
     });
   }
 
-  function escapeHtml(t){ return (t+'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
+  // Draw everything (internal coords)
+  function drawScene() {
+    // background
+    ctx.fillStyle = '#f7f6f2';
+    ctx.fillRect(0,0,INTERNAL_W,INTERNAL_H);
 
-  // Game loop
+    // subtle grid
+    ctx.strokeStyle = 'rgba(31,111,235,0.03)';
+    ctx.lineWidth = 1;
+    for (let y=0; y<INTERNAL_H; y+=40) {
+      ctx.beginPath();
+      ctx.moveTo(0,y+0.5);
+      ctx.lineTo(INTERNAL_W,y+0.5);
+      ctx.stroke();
+    }
+
+    // pipes
+    pipes.forEach(p => p.draw(ctx));
+
+    // ground / horizon
+    ctx.fillStyle = '#eef3f7';
+    ctx.fillRect(0, INTERNAL_H - 48, INTERNAL_W, 48);
+
+    // bird draw (kite)
+    bird.draw(ctx);
+  }
+
+  // Game over
+  function onGameOver() {
+    finalScoreEl && (finalScoreEl.innerText = score);
+    gameOverEl && gameOverEl.classList.remove('hidden');
+    persistScore(playerName, score);
+  }
+
+  // game loop (timestamp in ms from rAF)
   function loop(t) {
+    if (!lastFrameTime) lastFrameTime = t;
+    // delta normalized to 60fps ticks: 1.0 means one 60fps frame
+    const rawDeltaMs = t - lastFrameTime;
+    const delta = rawDeltaMs / (1000 / 60);
+    lastFrameTime = t;
+
     // spawn pipes on interval
-    if (t - lastPipeTime > PIPE_INTERVAL) {
+    if (t - lastPipeTime >= PIPE_INTERVAL) {
       spawnPipe();
       lastPipeTime = t;
     }
 
     // update
-    bird.update();
-    pipes.forEach(p => p.update());
+    bird.update(delta);
+    pipes.forEach(p => p.update(delta));
     // remove offscreen pipes
     pipes = pipes.filter(p => p.x + p.width > -40);
 
@@ -242,11 +288,11 @@
       if (!p.passed && (p.x + p.width/2) < bird.x) {
         p.passed = true;
         score += 1;
-        scoreLive.innerText = score;
+        scoreLive && (scoreLive.innerText = score);
       }
     });
 
-    // draw scene
+    // draw
     drawScene();
 
     // collision?
@@ -261,54 +307,20 @@
     loopId = requestAnimationFrame(loop);
   }
 
-  // draw everything
-  function drawScene() {
-    // background sky / subtle grid
-    ctx.fillStyle = '#f7f6f2';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    // subtle data grid lines
-    ctx.strokeStyle = 'rgba(31,111,235,0.03)';
-    ctx.lineWidth = 1;
-    for (let y=0; y<canvas.height; y+=40) {
-      ctx.beginPath();
-      ctx.moveTo(0,y+0.5);
-      ctx.lineTo(canvas.width,y+0.5);
-      ctx.stroke();
-    }
-
-    // pipes
-    pipes.forEach(p => p.draw(ctx));
-
-    // ground / horizon
-    ctx.fillStyle = '#eef3f7';
-    ctx.fillRect(0, canvas.height - 48, canvas.width, 48);
-
-    // bird draw (kite)
-    bird.draw(ctx);
-  }
-
-  // handle game over
-  function onGameOver() {
-    finalScoreEl.innerText = score;
-    gameOverEl.classList.remove('hidden');
-
-    // persist score locally
-    persistScore(playerName, score);
-  }
-
   // Input handlers
-  function flapHandler(e) {
+  function flapHandler() {
     if (!running) return;
     bird.flap();
   }
 
   // Start button wiring
-  startBtn.addEventListener('click', () => {
+  startBtn && startBtn.addEventListener('click', () => {
     const name = (discordInput.value || '').trim();
     playerName = name ? name : `Player`;
-    overlay.classList.add('hidden');
-    resetGame();
+    overlay && overlay.classList.add('hidden');
+    // reset timers and start loop
+    lastFrameTime = 0;
+    resetGame(performance.now());
     loopId = requestAnimationFrame(loop);
   });
 
@@ -329,24 +341,24 @@
   });
 
   // Play again
-  playAgain.addEventListener('click', () => {
-    overlay.classList.remove('hidden');
-    gameOverEl.classList.add('hidden');
+  playAgain && playAgain.addEventListener('click', () => {
+    overlay && overlay.classList.remove('hidden');
+    gameOverEl && gameOverEl.classList.add('hidden');
   });
 
   // Leaderboard
-  viewLeaderboard.addEventListener('click', () => {
+  viewLeaderboard && viewLeaderboard.addEventListener('click', () => {
     renderLeaderboard();
-    leaderModal.classList.remove('hidden');
+    leaderModal && leaderModal.classList.remove('hidden');
   });
-  showBoard.addEventListener('click', () => {
+  showBoard && showBoard.addEventListener('click', () => {
     renderLeaderboard();
-    leaderModal.classList.remove('hidden');
+    leaderModal && leaderModal.classList.remove('hidden');
   });
-  closeBoard.addEventListener('click', () => {
-    leaderModal.classList.add('hidden');
+  closeBoard && closeBoard.addEventListener('click', () => {
+    leaderModal && leaderModal.classList.add('hidden');
   });
-  clearScores.addEventListener('click', () => {
+  clearScores && clearScores.addEventListener('click', () => {
     if (!confirm('Clear all local scores? This cannot be undone on this device.')) return;
     localStorage.removeItem(STORAGE_KEY);
     renderLeaderboard();
@@ -354,20 +366,17 @@
 
   // initial visuals while logo loads
   logo.onload = () => {
-    // draw a quick splash in the canvas
     ctx.fillStyle = '#f7f6f2';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillRect(0,0,INTERNAL_W,INTERNAL_H);
     ctx.font = '26px Inter, Arial';
     ctx.fillStyle = '#333';
     ctx.textAlign = 'center';
-    ctx.fillText('Kite Pilot — Ready', canvas.width/2, canvas.height/2 - 20);
-    ctx.drawImage(logo, canvas.width/2 - 46, canvas.height/2 - 6, 92, 70);
+    ctx.fillText('Kite Pilot — Ready', INTERNAL_W/2, INTERNAL_H/2 - 20);
+    ctx.drawImage(logo, INTERNAL_W/2 - 46, INTERNAL_H/2 - 6, 92, 70);
   };
 
-  // small helper for mobile: if user taps overlay on start, show keyboard to enter name
-  overlay.addEventListener('pointerdown', (e) => {
-    // allow clicking input etc; nothing needed
-  });
+  // initial leaderboard render (if UI asks)
+  renderLeaderboard();
 
 })();
 
