@@ -6,8 +6,8 @@
   const GRAVITY = 0.2;
   const FLAP_STRENGTH = -5.8;
   const PIPE_SPEED = 0.9;
-  const PIPE_GAP = 240; // vertical gap
-  const PIPE_INTERVAL = 100; // ms between pipes
+  const PIPE_GAP = 180; // vertical gap
+  const PIPE_INTERVAL = 500; // ms between pipes
   const BIRD_X = 120; // fixed horizontal position of the kite
   const STORAGE_KEY = 'kitepilot_scores_v1';
 
@@ -370,5 +370,6 @@
   });
 
 })();
+
 
 
